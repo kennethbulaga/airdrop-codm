@@ -1,0 +1,60 @@
+import { z } from 'zod';
+
+export const presetSubmissionSchema = z.object({
+  user_id: z.string().uuid().optional().nullable(),
+  creator_name: z
+    .string()
+    .trim()
+    .min(2, 'Player name must be at least 2 characters')
+    .max(24, 'Player name cannot exceed 24 characters'),
+  team_name: z
+    .string()
+    .trim()
+    .max(12, 'Clan tag cannot exceed 12 characters')
+    .optional()
+    .or(z.literal('')),
+  code: z
+    .string()
+    .trim()
+    .min(6, 'CODM share code must be at least 6 characters')
+    .max(48, 'Share code cannot exceed 48 characters'),
+  description: z
+    .string()
+    .trim()
+    .max(120, 'Player note cannot exceed 120 characters')
+    .optional()
+    .or(z.literal('')),
+  category: z.enum(['graphics', 'hud', 'sensitivity']),
+  mode: z.enum(['Battle Royale', 'Multiplayer']),
+  playstyle: z.enum(['Rusher', 'Sniper', 'All-Rounder']).optional().nullable(),
+  device_type: z.enum(['Phone', 'iPad / Tablet']),
+  device_name: z
+    .string()
+    .trim()
+    .max(40, 'Device model cannot exceed 40 characters')
+    .optional()
+    .or(z.literal('')),
+  social_platform: z.enum(['YouTube', 'TikTok', 'Facebook', 'Twitch', 'X']).optional(),
+  social_handle: z
+    .string()
+    .trim()
+    .max(32, 'Social handle cannot exceed 32 characters')
+    .optional()
+    .or(z.literal('')),
+  grip: z.enum(['2-Finger Thumbs', '3-Finger', '4-Finger Claw', '5+ Finger']).optional(),
+  gyro: z.boolean().optional(),
+  image_url: z.string().url('Invalid image URL').optional().nullable().or(z.literal('')),
+}).superRefine((data, ctx) => {
+  if (
+    (data.category === 'graphics' || data.category === 'hud') &&
+    (!data.image_url || data.image_url.trim() === '')
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `A screenshot is required for ${data.category === 'graphics' ? 'Graphics' : 'HUD Layout'} setups.`,
+      path: ['image_url'],
+    });
+  }
+});
+
+export type PresetSubmissionInput = z.infer<typeof presetSubmissionSchema>;
