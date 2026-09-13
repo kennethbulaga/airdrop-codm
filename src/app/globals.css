@@ -41,7 +41,7 @@
 
   /* Font mappings */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-geist-sans), "Helvetica Neue", sans-serif;
-  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  --font-mono: var(--font-geist-mono), "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", var(--font-geist-sans), "Helvetica Neue", sans-serif;
 
   /* Apple drop shadows */

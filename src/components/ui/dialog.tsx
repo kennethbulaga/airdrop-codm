@@ -31,7 +31,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/40 duration-200 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -43,9 +43,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  showHandle = true,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  showHandle?: boolean
 }) {
   return (
     <DialogPortal>
@@ -53,11 +55,25 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-lg data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Base & Typography
+          "fixed z-50 grid w-full outline-none duration-200 bg-white text-sm text-[#1D1D1F]",
+          // Mobile: Native Bottom Sheet sliding up from bottom
+          "inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto rounded-t-[28px] rounded-b-none border-t border-black/10 p-5 shadow-[0_-8px_32px_rgba(0,0,0,0.14)] pb-[calc(1.25rem+env(safe-area-inset-bottom))]",
+          "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom",
+          // Desktop (sm+): Centered Modal Dialog
+          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:max-h-[85vh] sm:rounded-[28px] sm:border sm:border-black/10 sm:p-7 sm:shadow-2xl sm:pb-7",
+          "sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0",
           className
         )}
         {...props}
       >
+        {/* Mobile Swipe/Drag Indicator */}
+        {showHandle && (
+          <div
+            aria-hidden="true"
+            className="mx-auto -mt-1 mb-3 h-1.5 w-10 shrink-0 rounded-full bg-black/20 sm:hidden"
+          />
+        )}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -65,13 +81,12 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 size-9 sm:size-8 rounded-full text-[#86868B] hover:text-[#1D1D1F] hover:bg-black/5"
                 size="icon-sm"
               />
             }
           >
-            <XIcon
-            />
+            <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}

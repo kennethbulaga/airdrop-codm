@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { reportPresetAction } from '@/app/presets/actions';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
 
 interface ReportDialogProps {
   presetId: string;
@@ -37,7 +36,6 @@ export function ReportDialog({
   onClose,
   onReported,
 }: ReportDialogProps) {
-  const router = useRouter();
   const [selectedReason, setSelectedReason] = useState<string>('explicit_image');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -53,7 +51,6 @@ export function ReportDialog({
       const isQuarantined = (res.data as { is_quarantined?: boolean })?.is_quarantined;
       if (isQuarantined) {
         toast.success('Report received. Setup has been automatically quarantined.');
-        router.refresh();
       } else {
         toast.success('Report received. Thank you for keeping the vault safe.');
       }
@@ -70,7 +67,7 @@ export function ReportDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md w-full rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_24px_64px_rgba(0,0,0,0.18)]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader className="flex flex-col items-center text-center pb-2">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600 mb-3 shadow-sm">
             <ShieldAlert className="size-6 stroke-[2.2]" />
