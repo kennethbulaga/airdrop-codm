@@ -17,7 +17,7 @@ export const presetSubmissionSchema = z.object({
     .string()
     .trim()
     .min(6, 'CODM share code must be at least 6 characters')
-    .max(48, 'Share code cannot exceed 48 characters'),
+    .max(128, 'Share code cannot exceed 128 characters'),
   description: z
     .string()
     .trim()
@@ -41,8 +41,13 @@ export const presetSubmissionSchema = z.object({
     .max(32, 'Social handle cannot exceed 32 characters')
     .optional()
     .or(z.literal('')),
-  grip: z.enum(['2-Finger Thumbs', '3-Finger', '4-Finger Claw', '5+ Finger']).optional(),
+  youtube_url: z.string().trim().optional().nullable().or(z.literal('')),
+  tiktok_url: z.string().trim().optional().nullable().or(z.literal('')),
+  facebook_url: z.string().trim().optional().nullable().or(z.literal('')),
+  grip: z.enum(['2-Finger', '3-Finger', '4-Finger', '5+ Finger']).optional(),
   gyro: z.boolean().optional(),
+  graphic_quality: z.enum(['Low', 'Medium', 'High', 'Very High']).optional().nullable(),
+  fps_target: z.enum(['Low', 'Medium', 'High', 'Very High', 'Max', 'Ultra']).optional().nullable(),
   image_url: z.string().url('Invalid image URL').optional().nullable().or(z.literal('')),
 }).superRefine((data, ctx) => {
   if (
@@ -58,3 +63,38 @@ export const presetSubmissionSchema = z.object({
 });
 
 export type PresetSubmissionInput = z.infer<typeof presetSubmissionSchema>;
+
+export const profileUpdateSchema = z.object({
+  ign: z
+    .string()
+    .trim()
+    .min(2, 'In-game name must be at least 2 characters')
+    .max(24, 'In-game name cannot exceed 24 characters'),
+  clan_tag: z
+    .string()
+    .trim()
+    .max(10, 'Clan tag cannot exceed 10 characters')
+    .transform((val) => val.replace(/[[\]()]/g, '').trim().toUpperCase())
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  youtube_url: z.string().trim().optional().nullable().or(z.literal('')),
+  tiktok_url: z.string().trim().optional().nullable().or(z.literal('')),
+  facebook_url: z.string().trim().optional().nullable().or(z.literal('')),
+  social_platform: z.enum(['YouTube', 'TikTok', 'Facebook', 'Twitch', 'X']).optional().nullable(),
+  social_url: z.string().trim().optional().nullable().or(z.literal('')),
+  social_handle: z.string().trim().max(32, 'Handle cannot exceed 32 characters').optional().nullable().or(z.literal('')),
+});
+
+export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+
+export const feedbackSchema = z.object({
+  category: z.enum(['suggestion', 'bug', 'mode_request', 'general']),
+  message: z
+    .string()
+    .trim()
+    .min(5, 'Message must be at least 5 characters')
+    .max(1000, 'Message cannot exceed 1,000 characters'),
+});
+
+export type FeedbackInput = z.infer<typeof feedbackSchema>;

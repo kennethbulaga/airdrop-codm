@@ -1,11 +1,50 @@
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
-import type { ItemCategory, PostRecord } from './types';
+import { redis } from '@/lib/ratelimit';
+import type { ItemCategory, PostRecord, UserSessionProfile } from './types';
+
+const FEED_CACHE_TTL_SECONDS = 60;
 
 /**
- * Server Component query to fetch presets from Supabase with optional category filtering.
- * Strictly queries the PostgreSQL database with zero mock data.
+ * Purges the Upstash Redis feed cache upon mutations (insert, delete, upvote).
+ */
+export async function invalidateFeedCache(): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.del(
+      'airdrop:feed:all',
+      'airdrop:feed:hud',
+      'airdrop:feed:sensitivity',
+      'airdrop:feed:graphics'
+    );
+  } catch (err) {
+    console.warn('Redis feed cache invalidation failed (non-blocking):', err);
+  }
+}
+
+/**
+ * Server Component query to fetch presets with an Upstash Redis Cache-Aside layer.
+ * Drastically reduces Supabase 2GB egress and database compute while maintaining sub-second reads.
  */
 export async function getPresets(category?: ItemCategory): Promise<PostRecord[]> {
+  const cacheKey = category ? `airdrop:feed:${category}` : 'airdrop:feed:all';
+
+  // 1. Check Upstash Redis Cache-Aside Layer (Fast-path ~10ms, protects Supabase Free Tier)
+  if (redis) {
+    try {
+      const cached = await redis.get<PostRecord[]>(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        return cached;
+      }
+    } catch (err) {
+      if ((err as { digest?: string })?.digest === 'DYNAMIC_SERVER_USAGE') {
+        throw err;
+      }
+      console.warn('Redis cache lookup failed, falling back to Supabase:', err);
+    }
+  }
+
+  // 2. Cache Miss: Query Supabase PostgreSQL directly
   try {
     const supabase = await createClient();
     let query = supabase
@@ -25,7 +64,16 @@ export async function getPresets(category?: ItemCategory): Promise<PostRecord[]>
       return [];
     }
 
-    return (data as unknown as PostRecord[]) || [];
+    const records = (data as unknown as PostRecord[]) || [];
+
+    // 3. Write-back to Redis with 60-second TTL (non-blocking)
+    if (redis && records.length > 0) {
+      redis.set(cacheKey, records, { ex: FEED_CACHE_TTL_SECONDS }).catch((writeErr) => {
+        console.warn('Redis cache populate failed (non-blocking):', writeErr);
+      });
+    }
+
+    return records;
   } catch (err) {
     if ((err as { digest?: string })?.digest === 'DYNAMIC_SERVER_USAGE') {
       throw err;
@@ -60,17 +108,66 @@ export async function getFeaturedPreset(): Promise<PostRecord | undefined> {
 }
 
 /**
- * Server Component query to fetch preset IDs voted by the currently logged-in user.
+ * Cached Server Component query to fetch current user session once per request.
  */
-export async function getUserVotedPresetIds(): Promise<string[]> {
+export const getCachedCurrentUser = cache(async () => {
   try {
     const supabase = await createClient();
     const {
       data: { user },
+      error,
     } = await supabase.auth.getUser();
 
+    if (error || !user) {
+      return null;
+    }
+
+    return user;
+  } catch {
+    return null;
+  }
+});
+
+/**
+ * Cached Server Component query to fetch user session profile once per request.
+ */
+export const getCurrentUserProfile = cache(async (): Promise<UserSessionProfile | null> => {
+  const user = await getCachedCurrentUser();
+  if (!user) return null;
+
+  try {
+    const supabase = await createClient();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    return {
+      id: user.id,
+      name: profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Operator',
+      email: user.email || '',
+      clanTag: profile?.clan_tag || null,
+      avatarUrl: profile?.avatar_url || user.user_metadata?.avatar_url || null,
+      hasCompletedOnboarding: Boolean(profile?.has_completed_onboarding),
+      youtubeUrl: profile?.youtube_url || null,
+      tiktokUrl: profile?.tiktok_url || null,
+      facebookUrl: profile?.facebook_url || null,
+    };
+  } catch {
+    return null;
+  }
+});
+
+/**
+ * Server Component query to fetch preset IDs voted by the currently logged-in user.
+ */
+export async function getUserVotedPresetIds(): Promise<string[]> {
+  try {
+    const user = await getCachedCurrentUser();
     if (!user) return [];
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('preset_votes')
       .select('preset_id')
