@@ -4,6 +4,8 @@ import React, { useDeferredValue, useMemo, useState } from 'react';
 import { PlusCircle, RotateCcw, SearchX } from 'lucide-react';
 import { PresetCard } from './PresetCard';
 import { Button } from '@/components/ui/button';
+import { ReportDialog } from '@/components/ReportDialog';
+import { DeleteDialog } from '@/components/DeleteDialog';
 import type { PostRecord, FilterState } from '@/lib/types';
 import { calculateTrendingScore } from '@/lib/algorithms';
 import { togglePresetVoteAction } from '@/app/presets/actions';
@@ -33,6 +35,10 @@ export function PresetGrid({
   const [votedPostIds, setVotedPostIds] = useState<Set<string>>(
     () => new Set(initialVotedIds)
   );
+
+  // Hoisted modal states to avoid duplicating dialog instances per card in DOM
+  const [reportingPost, setReportingPost] = useState<PostRecord | null>(null);
+  const [deletingPost, setDeletingPost] = useState<PostRecord | null>(null);
 
   const handleToggleVote = async (postId: string) => {
     // 1. Optimistic toggle
@@ -75,14 +81,13 @@ export function PresetGrid({
       // 2. Universal Filters
       if (filters.device && post.device_type !== filters.device) return false;
       if (filters.mode && post.mode !== filters.mode) return false;
-      if (filters.playstyle && post.playstyle !== filters.playstyle) return false;
 
       // 3. Contextual Filters
       if (isSensitivityOrHud) {
         if (filters.grip && post.grip !== filters.grip) return false;
         if (filters.gyro !== null && post.gyro !== filters.gyro) return false;
       } else if (isGraphics) {
-        if (filters.tier && post.tier !== filters.tier) return false;
+        if (filters.graphicQuality && post.graphic_quality !== filters.graphicQuality) return false;
         if (filters.fpsTarget && post.fps_target !== filters.fpsTarget) return false;
       }
 
@@ -103,33 +108,46 @@ export function PresetGrid({
       return true;
     });
 
-    // Sort Ordering
-    return results.sort((a, b) => {
-      if (filters.sort === 'trending') {
-        const scoreA = calculateTrendingScore(a.upvotes, a.created_at);
-        const scoreB = calculateTrendingScore(b.upvotes, b.created_at);
-        return scoreB - scoreA;
-      }
-      if (filters.sort === 'top') {
-        return b.upvotes - a.upvotes;
-      }
-      if (filters.sort === 'latest') {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      }
-      return 0;
-    });
+    // Sort Ordering (precompute scores in O(N) instead of O(N log N) during sort)
+    if (filters.sort === 'trending') {
+      const scoreMap = new Map(
+        results.map((p) => [p.id, calculateTrendingScore(p.upvotes, p.created_at)])
+      );
+      return [...results].sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+    }
+    if (filters.sort === 'top') {
+      return [...results].sort((a, b) => b.upvotes - a.upvotes);
+    }
+    if (filters.sort === 'latest') {
+      return [...results].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+    return results;
   }, [initialPosts, filters, deferredSearch]);
+
+  const categoryLabel =
+    filters.category === 'hud'
+      ? 'HUD'
+      : filters.category === 'graphics'
+      ? 'Graphics'
+      : 'Sensitivity';
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Accessible Section Heading for Screen Readers & Search Crawlers */}
+      <h2 className="sr-only">
+        CODM Season 8 Battle Royale Community Setups, HUD Codes &amp; Sensitivity Presets
+      </h2>
+
       {/* Results Count Header */}
       <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
         <span>
           Showing <strong className="text-foreground font-mono tabular-nums">{filteredPosts.length}</strong>{' '}
           {filteredPosts.length === 1 ? 'setup' : 'setups'}
         </span>
-        <span className="font-medium text-[11px] capitalize">
-          Category: <span className="text-foreground font-semibold">{filters.category}</span>
+        <span className="font-medium text-[11px]">
+          Category: <span className="text-foreground font-semibold">{categoryLabel}</span>
         </span>
       </div>
 
@@ -144,6 +162,8 @@ export function PresetGrid({
               hasVoted={votedPostIds.has(post.id)}
               onToggleVote={handleToggleVote}
               onInspectImage={onInspectImage}
+              onRequestReport={(p) => setReportingPost(p)}
+              onRequestDelete={(p) => setDeletingPost(p)}
             />
           ))}
         </div>
@@ -164,7 +184,7 @@ export function PresetGrid({
               className="mt-5 gap-2 rounded-full bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold shadow-apple-pill min-h-[40px] px-5"
             >
               <PlusCircle className="size-4" />
-              <span>Share Your Setup</span>
+              <span>Share Setup</span>
             </Button>
           )}
         </div>
@@ -184,9 +204,28 @@ export function PresetGrid({
             className="mt-4 gap-1.5 rounded-full bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold shadow-apple-pill min-h-[38px] px-4"
           >
             <RotateCcw className="size-3.5" />
-            <span>Reset All Filters</span>
+            <span>Reset filters</span>
           </Button>
         </div>
+      )}
+
+      {/* Single Hoisted Dialog Instances */}
+      {deletingPost && (
+        <DeleteDialog
+          presetId={deletingPost.id}
+          creatorName={deletingPost.creator_name}
+          isOpen={Boolean(deletingPost)}
+          onClose={() => setDeletingPost(null)}
+        />
+      )}
+
+      {reportingPost && (
+        <ReportDialog
+          presetId={reportingPost.id}
+          creatorName={reportingPost.creator_name}
+          isOpen={Boolean(reportingPost)}
+          onClose={() => setReportingPost(null)}
+        />
       )}
     </div>
   );

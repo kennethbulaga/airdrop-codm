@@ -1,9 +1,16 @@
 'use client';
 
 import React from 'react';
-import { Compass, Crosshair, Filter, RotateCcw, Zap } from 'lucide-react';
-import type { FilterState, DeviceType, GripType, Playstyle } from '@/lib/types';
+import { Filter, Hand, RotateCcw, Smartphone, Tablet } from 'lucide-react';
+import type {
+  FilterState,
+  DeviceType,
+  GripType,
+  GraphicQuality,
+  GraphicFrameRate,
+} from '@/lib/types';
 import { triggerHaptic } from '@/lib/clipboard';
+import { cn } from '@/lib/utils';
 
 interface FilterChipBarProps {
   filters: FilterState;
@@ -11,14 +18,13 @@ interface FilterChipBarProps {
   onResetFilters: () => void;
 }
 
-const PLAYSTYLES: { type: Playstyle; label: string; icon: typeof Zap }[] = [
-  { type: 'Rusher', label: 'Rusher', icon: Zap },
-  { type: 'Sniper', label: 'Sniper', icon: Crosshair },
-  { type: 'All-Rounder', label: 'All-Rounder', icon: Compass },
-];
+const GRIP_TYPES: GripType[] = ['2-Finger', '3-Finger', '4-Finger', '5+ Finger'];
+const GRAPHIC_QUALITIES: GraphicQuality[] = ['Low', 'Medium', 'High', 'Very High'];
+const FRAME_RATES: GraphicFrameRate[] = ['Low', 'Medium', 'High', 'Very High', 'Max', 'Ultra'];
 
 export function FilterChipBar({ filters, onChangeFilters, onResetFilters }: FilterChipBarProps) {
-  const isSensitivityOrHud = filters.category === 'sensitivity' || filters.category === 'hud';
+  const isSensitivity = filters.category === 'sensitivity';
+  const isHud = filters.category === 'hud';
   const isGraphics = filters.category === 'graphics';
 
   const update = (partial: Partial<FilterState>) => {
@@ -27,9 +33,8 @@ export function FilterChipBar({ filters, onChangeFilters, onResetFilters }: Filt
   };
 
   const hasActiveFilters = Boolean(
-    filters.device !== null ||
-    (isSensitivityOrHud && (filters.playstyle !== null || filters.grip !== null || filters.gyro !== null)) ||
-    (isGraphics && (filters.tier !== null || filters.fpsTarget !== null))
+    ((isSensitivity || isHud) && (filters.device !== null || filters.grip !== null || filters.gyro !== null)) ||
+    (isGraphics && (filters.graphicQuality !== null || filters.fpsTarget !== null))
   );
 
   return (
@@ -54,138 +59,163 @@ export function FilterChipBar({ filters, onChangeFilters, onResetFilters }: Filt
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {/* 1. Device Form Factor (Universal) */}
-        {(['Phone', 'iPad / Tablet'] as DeviceType[]).map((device) => {
-          const isSelected = filters.device === device;
-          return (
-            <button
-              key={device}
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => update({ device: isSelected ? null : device })}
-              className={`rounded-full px-3.5 py-1.5 text-xs transition-all min-h-[34px] ${
-                isSelected
-                  ? 'bg-[#0071E3] text-white font-semibold shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
-                  : 'bg-white border border-black/[0.08] text-[#1D1D1F] hover:bg-[#F2F2F7] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-              }`}
-            >
-              {device}
-            </button>
-          );
-        })}
+      {/* 1. Category-Specific: Sensitivity & HUD (Two-Tiered Concentric Segmented Rails) */}
+      {(isSensitivity || isHud) && (
+        <div className="flex flex-col gap-2.5 w-full pt-2 border-t border-black/[0.06]">
+          {/* Tier 1: Device & Gyro */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+            <span className="text-[11px] font-bold text-[#86868B] uppercase tracking-wider shrink-0 sm:w-28">
+              Device &amp; Gyro
+            </span>
+            <div className="flex items-center gap-2 w-full sm:max-w-lg">
+              {/* Device Selector */}
+              <div className="grid grid-cols-2 flex-1 p-1 rounded-[14px] bg-black/[0.04] border border-black/[0.04] gap-1">
+                {(['Phone', 'iPad / Tablet'] as DeviceType[]).map((device) => {
+                  const isSelected = filters.device === device;
+                  return (
+                    <button
+                      key={device}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => update({ device: isSelected ? null : device })}
+                      className={cn(
+                        'flex items-center justify-center gap-1.5 rounded-[10px] px-2 py-1.5 text-xs font-semibold transition-all duration-150 min-h-[34px] select-none active:scale-[0.96] text-center',
+                        isSelected
+                          ? 'bg-[#0071E3] text-white shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
+                          : 'text-[#1D1D1F] hover:bg-white/80 hover:text-[#0071E3] font-medium'
+                      )}
+                    >
+                      {device === 'iPad / Tablet' ? (
+                        <Tablet className="size-3 shrink-0" />
+                      ) : (
+                        <Smartphone className="size-3 shrink-0" />
+                      )}
+                      <span>{device === 'iPad / Tablet' ? 'iPad' : 'Phone'}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-        {/* 2. Category-Specific: Sensitivity & HUD (Playstyles, Grip & Gyro) */}
-        {isSensitivityOrHud && (
-          <>
-            {/* Playstyle Filter Chips (Rusher, Sniper, All-Rounder) */}
-            {PLAYSTYLES.map(({ type, label, icon: Icon }) => {
-              const isSelected = filters.playstyle === type;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => update({ playstyle: isSelected ? null : type })}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs transition-all min-h-[34px] select-none ${
-                    isSelected
-                      ? 'bg-[#0071E3] text-white font-semibold shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
-                      : 'bg-white border border-black/[0.08] text-[#1D1D1F] hover:bg-[#F2F2F7] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                  }`}
-                >
-                  <Icon className={`size-3 stroke-[2.2] ${isSelected ? 'text-white' : 'text-[#86868B]'}`} />
-                  <span>{label}</span>
-                </button>
-              );
-            })}
+              {/* Gyro Selector */}
+              <div className="grid grid-cols-2 w-36 sm:w-44 p-1 rounded-[14px] bg-black/[0.04] border border-black/[0.04] gap-1">
+                {[
+                  { label: 'Gyro ON', val: true },
+                  { label: 'Gyro OFF', val: false },
+                ].map(({ label, val }) => {
+                  const isSelected = filters.gyro === val;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => update({ gyro: isSelected ? null : val })}
+                      className={cn(
+                        'flex items-center justify-center rounded-[10px] px-2 py-1.5 text-xs font-semibold transition-all duration-150 min-h-[34px] select-none active:scale-[0.96] text-center',
+                        isSelected
+                          ? 'bg-[#0071E3] text-white shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
+                          : 'text-[#1D1D1F] hover:bg-white/80 hover:text-[#0071E3] font-medium'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
-            {(['2-Finger Thumbs', '3-Finger', '4-Finger Claw', '5+ Finger'] as GripType[]).map((grip) => {
-              const isSelected = filters.grip === grip;
-              return (
-                <button
-                  key={grip}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => update({ grip: isSelected ? null : grip })}
-                  className={`rounded-full px-3.5 py-1.5 text-xs transition-all min-h-[34px] ${
-                    isSelected
-                      ? 'bg-[#0071E3] text-white font-semibold shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
-                      : 'bg-white border border-black/[0.08] text-[#1D1D1F] hover:bg-[#F2F2F7] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                  }`}
-                >
-                  {grip}
-                </button>
-              );
-            })}
+          {/* Tier 2: Finger Grip Rail */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+            <span className="text-[11px] font-bold text-[#86868B] uppercase tracking-wider shrink-0 sm:w-28">
+              Finger Grip
+            </span>
+            <div className="grid grid-cols-4 w-full sm:max-w-lg p-1 rounded-[14px] bg-black/[0.04] border border-black/[0.04] gap-1">
+              {GRIP_TYPES.map((grip) => {
+                const isSelected = filters.grip === grip;
+                return (
+                  <button
+                    key={grip}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => update({ grip: isSelected ? null : grip })}
+                    className={cn(
+                      'flex items-center justify-center gap-1 rounded-[10px] px-1.5 py-1.5 text-xs font-semibold transition-all duration-150 min-h-[34px] select-none active:scale-[0.96] text-center',
+                      isSelected
+                        ? 'bg-[#0071E3] text-white shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
+                        : 'text-[#1D1D1F] hover:bg-white/80 hover:text-[#0071E3] font-medium'
+                    )}
+                    title={grip}
+                  >
+                    <Hand className="size-2.5 shrink-0 opacity-70" />
+                    <span className="truncate">{grip}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
-            {/* Gyroscope toggle */}
-            {[
-              { label: 'Gyro ON', val: true },
-              { label: 'Gyro OFF', val: false },
-            ].map(({ label, val }) => {
-              const isSelected = filters.gyro === val;
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => update({ gyro: isSelected ? null : val })}
-                  className={`rounded-full px-3.5 py-1.5 text-xs transition-all min-h-[34px] ${
-                    isSelected
-                      ? 'bg-[#0071E3] text-white font-semibold shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
-                      : 'bg-white border border-black/[0.08] text-[#1D1D1F] hover:bg-[#F2F2F7] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </>
-        )}
+      {/* 2. Category-Specific: Graphics (Concentric Equal-Width Segmented Rails) */}
+      {isGraphics && (
+        <div className="flex flex-col gap-2.5 w-full pt-2 border-t border-black/[0.06]">
+          {/* Rail 1: Graphic Quality */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+            <span className="text-[11px] font-bold text-[#86868B] uppercase tracking-wider shrink-0 sm:w-28">
+              Graphic Quality
+            </span>
+            <div className="grid grid-cols-4 w-full sm:max-w-lg p-1 rounded-[14px] bg-black/[0.04] border border-black/[0.04] gap-1">
+              {GRAPHIC_QUALITIES.map((quality) => {
+                const isSelected = filters.graphicQuality === quality;
+                return (
+                  <button
+                    key={quality}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => update({ graphicQuality: isSelected ? null : quality })}
+                    className={cn(
+                      'flex items-center justify-center rounded-[10px] px-2 py-1.5 text-xs font-semibold transition-all duration-150 min-h-[34px] select-none active:scale-[0.96] text-center',
+                      isSelected
+                        ? 'bg-[#0071E3] text-white shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
+                        : 'text-[#1D1D1F] hover:bg-white/80 hover:text-[#0071E3] font-medium'
+                    )}
+                  >
+                    {quality}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-        {/* 5. Category-Specific: Graphics (FPS & Tier) */}
-        {isGraphics && (
-          <>
-            {(['Max 90 FPS', 'Ultra 120 FPS']).map((fps) => {
-              const isSelected = filters.fpsTarget === fps;
-              return (
-                <button
-                  key={fps}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => update({ fpsTarget: isSelected ? null : fps })}
-                  className={`rounded-full px-3.5 py-1.5 text-xs transition-all min-h-[34px] ${
-                    isSelected
-                      ? 'bg-[#0071E3] text-white font-semibold shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
-                      : 'bg-white border border-black/[0.08] text-[#1D1D1F] hover:bg-[#F2F2F7] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                  }`}
-                >
-                  {fps}
-                </button>
-              );
-            })}
-
-            {(['Budget / Mid-tier', 'Flagship']).map((tier) => {
-              const isSelected = filters.tier === tier;
-              return (
-                <button
-                  key={tier}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => update({ tier: isSelected ? null : tier })}
-                  className={`rounded-full px-3.5 py-1.5 text-xs transition-all min-h-[34px] ${
-                    isSelected
-                      ? 'bg-[#0071E3] text-white font-semibold shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
-                      : 'bg-white border border-black/[0.08] text-[#1D1D1F] hover:bg-[#F2F2F7] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                  }`}
-                >
-                  {tier}
-                </button>
-              );
-            })}
-          </>
-        )}
-      </div>
+          {/* Rail 2: Frame Rate */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+            <span className="text-[11px] font-bold text-[#86868B] uppercase tracking-wider shrink-0 sm:w-28">
+              Frame Rate
+            </span>
+            <div className="grid grid-cols-3 sm:grid-cols-6 w-full sm:max-w-lg p-1 rounded-[14px] bg-black/[0.04] border border-black/[0.04] gap-1">
+              {FRAME_RATES.map((fps) => {
+                const isSelected = filters.fpsTarget === fps;
+                return (
+                  <button
+                    key={fps}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => update({ fpsTarget: isSelected ? null : fps })}
+                    className={cn(
+                      'flex items-center justify-center rounded-[10px] px-1.5 py-1.5 text-xs font-semibold transition-all duration-150 min-h-[38px] sm:min-h-[34px] select-none active:scale-[0.96] text-center',
+                      isSelected
+                        ? 'bg-[#0071E3] text-white shadow-[0_2px_6px_rgba(0,113,227,0.25)]'
+                        : 'text-[#1D1D1F] hover:bg-white/80 hover:text-[#0071E3] font-medium'
+                    )}
+                  >
+                    {fps}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

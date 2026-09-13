@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Flag, Info, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Copy, Flag, Info, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,12 @@ interface LightboxModalProps {
   currentUserId?: string | null;
 }
 
-export function LightboxModal({ post, isOpen, onClose, currentUserId }: LightboxModalProps) {
+export function LightboxModal({
+  post,
+  isOpen,
+  onClose,
+  currentUserId,
+}: LightboxModalProps) {
   const [copied, setCopied] = React.useState(false);
   const [isReportOpen, setIsReportOpen] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
@@ -43,22 +48,37 @@ export function LightboxModal({ post, isOpen, onClose, currentUserId }: Lightbox
     const success = await copyToClipboard(post.code);
     if (success) {
       setCopied(true);
-      toast.success('Share code copied to clipboard');
+      toast.custom(() => (
+        <div className="flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-2.5 text-[#1D1D1F] shadow-[0_12px_32px_rgba(0,0,0,0.15)] border border-black/10 backdrop-blur-xl max-w-sm">
+          <div className="flex size-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 shrink-0">
+            <Check className="size-3.5 stroke-[3]" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold truncate">{post.creator_name}&apos;s code copied!</span>
+            <span className="text-[10px] text-[#6E6E73] truncate">Ready to paste into CODM</span>
+          </div>
+          <span className="ml-auto rounded-full bg-[#0071E3]/10 px-2 py-0.5 font-mono text-[9px] font-bold text-[#0071E3] shrink-0">
+            1-TAP
+          </span>
+        </div>
+      ));
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl w-full overflow-hidden rounded-3xl border-border/60 bg-card/95 p-0 backdrop-blur-xl shadow-apple-island">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
         <DialogHeader className="border-b border-border/40 p-4 sm:p-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative flex size-10 items-center justify-center rounded-[12px] overflow-hidden bg-gradient-to-br from-[#0071E3] to-[#005bb5] text-white font-bold text-sm shadow-[0_2px_8px_rgba(0,113,227,0.2)] ring-1 ring-black/5 shrink-0">
                 {post.creator_avatar_url ? (
-                  <img
+                  <Image
                     src={post.creator_avatar_url}
                     alt={post.creator_name}
+                    width={40}
+                    height={40}
                     className="size-full object-cover"
                   />
                 ) : (
@@ -77,7 +97,12 @@ export function LightboxModal({ post, isOpen, onClose, currentUserId }: Lightbox
                   )}
                 </div>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  {post.device_name || post.device_type} • {post.mode} • Season {post.season}
+                  {post.device_name || post.device_type}
+                  {post.category === 'hud' && post.grip ? ` • ${post.grip}` : ''}
+                  {post.category === 'hud' && post.gyro !== null && post.gyro !== undefined ? (post.gyro ? ' • Gyro ON' : ' • Gyro OFF') : ''}
+                  {post.category === 'graphics' && post.graphic_quality ? ` • ${post.graphic_quality} Quality` : ''}
+                  {post.category === 'graphics' && post.fps_target ? ` • ${post.fps_target} Frame Rate` : ''}
+                  {` • ${post.mode} • ${post.season.startsWith('Season') ? post.season : `Season ${post.season.replace(/^S/i, '')}`}`}
                 </DialogDescription>
               </div>
             </div>
@@ -99,7 +124,7 @@ export function LightboxModal({ post, isOpen, onClose, currentUserId }: Lightbox
                 onClick={() => setIsReportOpen(true)}
                 className="flex items-center gap-1.5 text-xs text-[#6E6E73] hover:text-red-500 transition-colors px-3 py-1.5 rounded-full border border-black/[0.08] bg-[#F2F2F7] hover:bg-red-500/10 shrink-0 font-medium"
                 title="Report inappropriate content"
-                aria-label="Report preset"
+                aria-label="Report setup"
               >
                 <Flag className="size-3.5" />
                 <span className="hidden sm:inline">Report</span>
@@ -111,10 +136,14 @@ export function LightboxModal({ post, isOpen, onClose, currentUserId }: Lightbox
         {/* Screenshot Viewport (Dynamically adapts to Phone 19.5:9/20:9/16:9 or Tablet 4:3 dimensions) */}
         <div className="relative w-full bg-black/5 flex items-center justify-center overflow-hidden">
           {post.image_url ? (
-            <img
+            <Image
               src={post.image_url}
               alt={`${post.creator_name}'s CODM ${post.category} configuration`}
+              width={1920}
+              height={1080}
+              unoptimized
               className="w-full max-h-[65vh] object-contain select-none"
+              priority
             />
           ) : (
             <div className="py-16 text-center text-xs text-muted-foreground">
@@ -161,6 +190,101 @@ export function LightboxModal({ post, isOpen, onClose, currentUserId }: Lightbox
                   <li className="flex items-center gap-1 font-bold text-[#0071E3]">
                     <span className="flex size-4 items-center justify-center rounded-full bg-[#0071E3] text-white text-[10px] font-bold shrink-0">5</span>
                     <span>Import then Paste Code</span>
+                  </li>
+                </ol>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
+
+        {/* How to Import in CODM (HUD Layout Section) */}
+        {post.category === 'hud' && (
+          <div className="border-t border-border/40 bg-[#F2F2F7]/70 px-4 py-2.5 sm:px-6">
+            <Collapsible defaultOpen={false}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-semibold text-[#1D1D1F] hover:text-[#0071E3] transition-colors group cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-5 items-center justify-center rounded-full bg-[#0071E3]/10 text-[#0071E3]">
+                    <Info className="size-3" />
+                  </div>
+                  <span>How to import this HUD code in CODM</span>
+                </div>
+                <ChevronDown className="size-3.5 text-[#86868B] transition-transform duration-200 group-data-[panel-open]:rotate-180 group-aria-expanded:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <ol className="flex flex-wrap items-center gap-1.5 text-xs text-[#6E6E73] bg-white rounded-xl p-2.5 border border-black/[0.06] shadow-sm">
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">1</span>
+                    Settings
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">2</span>
+                    Controls
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">3</span>
+                    Custom Layout [Go]
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">4</span>
+                    Cloud Layout
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">5</span>
+                    Search / Paste Code
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-bold text-[#0071E3]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#0071E3] text-white text-[10px] font-bold shrink-0">6</span>
+                    <span>Preview & Apply</span>
+                  </li>
+                </ol>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
+
+        {/* How to Import in CODM (Sensitivity Section) */}
+        {post.category === 'sensitivity' && (
+          <div className="border-t border-border/40 bg-[#F2F2F7]/70 px-4 py-2.5 sm:px-6">
+            <Collapsible defaultOpen={false}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-semibold text-[#1D1D1F] hover:text-[#0071E3] transition-colors group cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-5 items-center justify-center rounded-full bg-[#0071E3]/10 text-[#0071E3]">
+                    <Info className="size-3" />
+                  </div>
+                  <span>How to import this sensitivity code in CODM</span>
+                </div>
+                <ChevronDown className="size-3.5 text-[#86868B] transition-transform duration-200 group-data-[panel-open]:rotate-180 group-aria-expanded:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <ol className="flex flex-wrap items-center gap-1.5 text-xs text-[#6E6E73] bg-white rounded-xl p-2.5 border border-black/[0.06] shadow-sm">
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">1</span>
+                    Settings
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">2</span>
+                    Sensitivity
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">3</span>
+                    Manage (bottom right)
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-medium text-[#1D1D1F]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#F2F2F7] text-[10px] font-bold shrink-0">4</span>
+                    Search tab
+                  </li>
+                  <ChevronRight className="size-3 text-[#86868B] shrink-0" />
+                  <li className="flex items-center gap-1 font-bold text-[#0071E3]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#0071E3] text-white text-[10px] font-bold shrink-0">5</span>
+                    <span>Paste &amp; Preview</span>
                   </li>
                 </ol>
               </CollapsibleContent>

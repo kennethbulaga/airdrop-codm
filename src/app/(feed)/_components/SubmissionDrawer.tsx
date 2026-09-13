@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
-import type { User } from '@supabase/supabase-js';
+import React, { useState, useTransition } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { signInWithGoogle } from '@/app/auth/actions';
 import {
@@ -17,14 +17,13 @@ import { Label } from '@/components/ui/label';
 import {
   CheckCircle2,
   ChevronRight,
-  Compass,
-  Crosshair,
   ImagePlus,
   Info,
+  Lightbulb,
   Loader2,
+  ShieldCheck,
   Trash2,
-  UploadCloud,
-  Zap,
+  UserCog,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -32,12 +31,23 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import type { ItemCategory, DeviceType, GripType, GameMode, Playstyle, UserSessionProfile } from '@/lib/types';
+import type {
+  ItemCategory,
+  DeviceType,
+  GripType,
+  GameMode,
+  UserSessionProfile,
+  GraphicQuality,
+  GraphicFrameRate,
+} from '@/lib/types';
 import { triggerHaptic } from '@/lib/clipboard';
 import { presetSubmissionSchema } from '@/lib/validations';
 import { createPresetAction } from '@/app/presets/actions';
 import { compressImageToWebP } from '@/lib/image-compression';
 import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { OnboardingModal } from './OnboardingModal';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
 
 interface SubmissionDrawerProps {
   isOpen: boolean;
@@ -55,17 +65,14 @@ export function SubmissionDrawer({
   const [user, setUser] = useState<UserSessionProfile | null>(initialCurrentUser ?? null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(initialCurrentUser === undefined);
   const [category, setCategory] = useState<ItemCategory>('graphics');
-  const [creatorName, setCreatorName] = useState(() => initialCurrentUser?.name || '');
-  const [teamName, setTeamName] = useState('');
-  const [socialPlatform, setSocialPlatform] = useState('YouTube');
-  const [socialUrl, setSocialUrl] = useState('');
   const [code, setCode] = useState('');
-  const [mode, setMode] = useState<GameMode>('Battle Royale');
-  const [playstyle, setPlaystyle] = useState<Playstyle>('Rusher');
+  const [mode] = useState<GameMode>('Battle Royale');
   const [deviceType, setDeviceType] = useState<DeviceType>('Phone');
   const [deviceName, setDeviceName] = useState('');
-  const [grip, setGrip] = useState<GripType>('4-Finger Claw');
+  const [grip, setGrip] = useState<GripType>('4-Finger');
   const [gyro, setGyro] = useState(true);
+  const [graphicQuality, setGraphicQuality] = useState<GraphicQuality>('Low');
+  const [fpsTarget, setFpsTarget] = useState<GraphicFrameRate>('Max');
   const [description, setDescription] = useState('');
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
@@ -73,6 +80,9 @@ export function SubmissionDrawer({
   const [isCompressing, setIsCompressing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningIn, startSignInTransition] = useTransition();
@@ -83,73 +93,13 @@ export function SubmissionDrawer({
     });
   };
 
-  // Synchronize when initialCurrentUser prop changes
-  useEffect(() => {
-    if (initialCurrentUser !== undefined) {
-      setUser(initialCurrentUser);
-      setIsAuthLoading(false);
-      if (initialCurrentUser) {
-        setCreatorName((prev: string) => prev || initialCurrentUser.name || '');
-      }
-    }
-  }, [initialCurrentUser]);
+  const [prevUserProp, setPrevUserProp] = useState(initialCurrentUser);
+  if (initialCurrentUser !== undefined && initialCurrentUser !== prevUserProp) {
+    setPrevUserProp(initialCurrentUser);
+    setUser(initialCurrentUser);
+    setIsAuthLoading(false);
+  }
 
-  // Real-time client session listener & fallback client verification
-  useEffect(() => {
-    const supabase = createClient();
-
-    if (initialCurrentUser === undefined) {
-      supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
-        if (currentUser) {
-          const profile: UserSessionProfile = {
-            id: currentUser.id,
-            email: currentUser.email,
-            name:
-              currentUser.user_metadata?.full_name ||
-              currentUser.user_metadata?.name ||
-              currentUser.email?.split('@')[0] ||
-              'Operator',
-            avatarUrl: (currentUser.user_metadata?.avatar_url ||
-              currentUser.user_metadata?.picture) as string | undefined,
-          };
-          setUser(profile);
-          setIsAuthLoading(false);
-          setCreatorName((prev: string) => prev || profile.name);
-        } else {
-          setUser(null);
-          setIsAuthLoading(false);
-        }
-      });
-    }
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const profile: UserSessionProfile = {
-          id: session.user.id,
-          email: session.user.email,
-          name:
-            session.user.user_metadata?.full_name ||
-            session.user.user_metadata?.name ||
-            session.user.email?.split('@')[0] ||
-            'Operator',
-          avatarUrl: (session.user.user_metadata?.avatar_url ||
-            session.user.user_metadata?.picture) as string | undefined,
-        };
-        setUser(profile);
-        setIsAuthLoading(false);
-        setCreatorName((prev: string) => prev || profile.name);
-      } else {
-        setUser(null);
-        setIsAuthLoading(false);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [initialCurrentUser]);
 
   const handleImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -189,6 +139,13 @@ export function SubmissionDrawer({
     e.preventDefault();
     triggerHaptic(10);
 
+    // Require completed operator onboarding before publishing
+    if (user && !user.hasCompletedOnboarding) {
+      toast.error('Please claim your Call of Duty: Mobile In-Game Name first.');
+      setIsOnboardingOpen(true);
+      return;
+    }
+
     // Validate category screenshot requirements before starting upload
     if ((category === 'graphics' || category === 'hud') && !screenshotFile) {
       toast.error(
@@ -220,7 +177,7 @@ export function SubmissionDrawer({
 
         if (uploadError) {
           setIsSubmitting(false);
-          toast.error(`Screenshot upload failed: ${uploadError.message}`);
+          toast.error('Unable to upload screenshot. Check your connection or choose a smaller image.');
           return;
         }
 
@@ -228,7 +185,7 @@ export function SubmissionDrawer({
           .from('presets')
           .getPublicUrl(uploadData.path);
         uploadedImageUrl = urlData.publicUrl;
-      } catch (uploadErr) {
+      } catch {
         setIsSubmitting(false);
         toast.error('Failed to upload screenshot to storage.');
         return;
@@ -237,19 +194,23 @@ export function SubmissionDrawer({
 
     const parsed = presetSubmissionSchema.safeParse({
       user_id: user?.id,
-      creator_name: creatorName,
-      team_name: teamName || undefined,
+      creator_name: user?.name || 'Operator',
+      team_name: user?.clanTag || undefined,
+      youtube_url: user?.youtubeUrl || undefined,
+      tiktok_url: user?.tiktokUrl || undefined,
+      facebook_url: user?.facebookUrl || undefined,
+      social_platform: user?.socialPlatform || undefined,
+      social_handle: user?.socialUrl || undefined,
       code,
       description: description || undefined,
       category,
       mode,
-      playstyle: category !== 'graphics' ? playstyle : undefined,
       device_type: deviceType,
       device_name: deviceName || undefined,
-      social_platform: socialPlatform,
-      social_handle: socialUrl || undefined,
       grip: category !== 'graphics' ? grip : undefined,
       gyro: category !== 'graphics' ? gyro : undefined,
+      graphic_quality: category === 'graphics' ? graphicQuality : undefined,
+      fps_target: category === 'graphics' ? fpsTarget : undefined,
       image_url: uploadedImageUrl,
     });
 
@@ -267,22 +228,24 @@ export function SubmissionDrawer({
       return;
     }
 
-    toast.success('Setup shared with the community vault!');
+    toast.success('Setup shared to the community vault.');
     handleRemoveScreenshot();
     onClose();
+    onPostCreated?.();
     // Reset form
     setCode('');
     setDescription('');
     setDeviceName('');
-    setTeamName('');
+    setGraphicQuality('Low');
+    setFpsTarget('Max');
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          "w-full rounded-[28px] border border-black/10 bg-white p-6 sm:p-8 shadow-[0_24px_64px_rgba(0,0,0,0.18)] transition-all",
-          !isAuthLoading && user ? "sm:max-w-2xl max-h-[90vh] overflow-y-auto" : "sm:max-w-md"
+          !isAuthLoading && user ? "sm:max-w-2xl sm:max-h-[90vh]" : "sm:max-w-md"
         )}
       >
         {isAuthLoading ? (
@@ -302,8 +265,14 @@ export function SubmissionDrawer({
               Sign in with Google to publish your setup to the vault.
             </DialogDescription>
 
-            <div className="flex size-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#0071E3] to-[#005bb5] text-white shadow-[0_4px_16px_rgba(0,113,227,0.25)] mb-3.5">
-              <Crosshair className="size-7 stroke-[2.5]" />
+            <div className="relative flex size-14 items-center justify-center rounded-[18px] overflow-hidden bg-black/5 shadow-[0_4px_16px_rgba(0,113,227,0.25)] ring-1 ring-black/5 mb-3.5">
+              <Image
+                src="/airdrop-logo.webp"
+                alt="Airdrop"
+                width={56}
+                height={56}
+                className="size-full object-cover"
+              />
             </div>
 
             <h3 className="text-xl font-bold font-heading text-[#1D1D1F]">
@@ -357,8 +326,8 @@ export function SubmissionDrawer({
                   <span className="truncate">
                     Publishing as{' '}
                     <strong className="font-semibold">
-                      {teamName.trim() ? `${teamName.trim()} ` : ''}
-                      {creatorName.trim() || user.name || user.email || 'Operator'}
+                      {user?.clanTag ? `${user.clanTag} ` : ''}
+                      {user?.name || user?.email || 'Operator'}
                     </strong>
                   </span>
                 </div>
@@ -375,119 +344,64 @@ export function SubmissionDrawer({
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Category</Label>
               <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-muted p-1">
-                {(['graphics', 'hud', 'sensitivity'] as ItemCategory[]).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCategory(cat)}
-                    className={`rounded-lg py-1.5 text-xs font-semibold capitalize transition-all ${
-                      category === cat
-                        ? 'bg-background text-foreground shadow-apple-pill'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+                {(['graphics', 'hud', 'sensitivity'] as ItemCategory[]).map((cat) => {
+                  const label = cat === 'hud' ? 'HUD' : cat === 'graphics' ? 'Graphics' : 'Sensitivity';
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategory(cat)}
+                      className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                        category === cat
+                          ? 'bg-background text-foreground shadow-apple-pill'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Playstyle Selector (Sensitivity & HUD only) */}
-            {category !== 'graphics' && (
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-semibold">Playstyle / Combat Role</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { type: 'Rusher' as Playstyle, label: 'Rusher', icon: Zap },
-                    { type: 'Sniper' as Playstyle, label: 'Sniper', icon: Crosshair },
-                    { type: 'All-Rounder' as Playstyle, label: 'All-Rounder', icon: Compass },
-                  ].map(({ type, label, icon: Icon }) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setPlaystyle(type)}
-                      className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all border ${
-                        playstyle === type
-                          ? 'bg-[#0071E3] text-white border-[#0071E3] shadow-sm'
-                          : 'bg-muted/60 text-muted-foreground border-transparent hover:bg-muted'
-                      }`}
-                    >
-                      <Icon className="size-3.5 stroke-[2.2]" />
-                      <span>{label}</span>
-                    </button>
-                  ))}
+            {/* Verified Operator Identity Section */}
+            {user && (
+              <div className="flex items-center justify-between rounded-2xl bg-[#F2F2F7]/70 p-3.5 border border-black/[0.06]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="size-10 ring-2 ring-black/5 shrink-0">
+                    {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+                    <AvatarFallback className="bg-gradient-to-br from-[#0071E3] to-[#005bb5] text-white font-bold text-xs">
+                      {(user.name || 'O').charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {user.clanTag && (
+                        <span className="inline-flex items-center rounded-md bg-[#0071E3]/10 px-2 py-0.5 text-[11px] font-mono font-bold text-[#0071E3] border border-[#0071E3]/20">
+                          {user.clanTag}
+                        </span>
+                      )}
+                      <span className="font-heading text-sm font-bold text-[#1D1D1F] truncate">
+                        {user.name}
+                      </span>
+                      <ShieldCheck className="size-3.5 text-[#0071E3] shrink-0" />
+                    </div>
+                    <span className="text-[11px] text-[#86868B] font-medium">
+                      Posting as Verified Operator
+                    </span>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsProfileSettingsOpen(true)}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#0071E3] hover:underline px-2.5 py-1.5 rounded-lg hover:bg-black/[0.03] transition-colors shrink-0"
+                >
+                  <UserCog className="size-3.5" />
+                  <span>Edit Profile</span>
+                </button>
               </div>
             )}
-
-            {/* Creator & Clan */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="creator_name" className="text-xs font-semibold">
-                  Player / In-Game Name (IGN) *
-                </Label>
-                <Input
-                  id="creator_name"
-                  placeholder="Your in-game name (e.g. Ghost)"
-                  value={creatorName}
-                  onChange={(e) => setCreatorName(e.target.value)}
-                  className="h-10 rounded-xl"
-                  maxLength={24}
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="team_name" className="text-xs font-semibold">
-                  Clan Tag (Optional)
-                </Label>
-                <Input
-                  id="team_name"
-                  placeholder="e.g. SQUAD (leave blank if solo)"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  className="h-10 rounded-xl font-mono text-xs uppercase"
-                  maxLength={12}
-                />
-              </div>
-            </div>
-
-            {/* Social Media Link (YouTube / TikTok) */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-semibold">Social Platform (Optional)</Label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {(['YouTube', 'TikTok'] as const).map((plat) => (
-                    <button
-                      key={plat}
-                      type="button"
-                      onClick={() => setSocialPlatform(plat)}
-                      className={`rounded-xl py-2 text-xs font-semibold transition-all ${
-                        socialPlatform === plat
-                          ? 'bg-primary text-primary-foreground shadow-apple-pill'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {plat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="social_handle" className="text-xs font-semibold">
-                  Channel Handle (Optional)
-                </Label>
-                <Input
-                  id="social_handle"
-                  placeholder={socialPlatform === 'TikTok' ? '@handle' : '@channel'}
-                  value={socialUrl}
-                  onChange={(e) => setSocialUrl(e.target.value)}
-                  className="h-10 rounded-xl text-xs"
-                  maxLength={32}
-                />
-              </div>
-            </div>
 
             {/* Share Code */}
             <div className="flex flex-col gap-1.5">
@@ -503,11 +417,15 @@ export function SubmissionDrawer({
               </div>
               <Input
                 id="code"
-                placeholder="e.g. 7123-8941-2041-3921-102"
+                placeholder={
+                  category === 'hud'
+                    ? 'e.g. 7283462325313002856-7283462325313002851'
+                    : 'e.g. 0_1_171_271_682_782_552_153_57_1577_621_184_204_'
+                }
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="h-10 rounded-xl font-mono text-xs"
-                maxLength={48}
+                maxLength={128}
                 required
               />
               {category === 'graphics' && (
@@ -527,6 +445,50 @@ export function SubmissionDrawer({
                       <li className="font-semibold text-[#1D1D1F]">4. Unfold</li>
                       <ChevronRight className="size-2.5 text-[#86868B]" />
                       <li className="font-bold text-[#0071E3]">5. Share (Copy Code)</li>
+                    </ol>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {category === 'hud' && (
+                <Collapsible defaultOpen={false} className="mt-0.5">
+                  <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-[#0071E3] hover:underline font-medium cursor-pointer">
+                    <Info className="size-3" />
+                    <span>How to find your HUD share code in CODM</span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-1.5">
+                    <ol className="flex flex-wrap items-center gap-1 text-[10px] sm:text-[11px] text-[#6E6E73] bg-[#F2F2F7] rounded-xl p-2.5 border border-black/[0.04]">
+                      <li className="font-semibold text-[#1D1D1F]">1. Settings</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-semibold text-[#1D1D1F]">2. Controls</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-semibold text-[#1D1D1F]">3. Custom Layout [Go]</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-semibold text-[#1D1D1F]">4. Cloud Layout</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-bold text-[#0071E3]">5. Copy Code (under &quot;IN USE&quot;)</li>
+                    </ol>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {category === 'sensitivity' && (
+                <Collapsible defaultOpen={false} className="mt-0.5">
+                  <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-[#0071E3] hover:underline font-medium cursor-pointer">
+                    <Info className="size-3" />
+                    <span>How to find your sensitivity share code in CODM</span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-1.5">
+                    <ol className="flex flex-wrap items-center gap-1 text-[10px] sm:text-[11px] text-[#6E6E73] bg-[#F2F2F7] rounded-xl p-2.5 border border-black/[0.04]">
+                      <li className="font-semibold text-[#1D1D1F]">1. Settings</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-semibold text-[#1D1D1F]">2. Sensitivity</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-semibold text-[#1D1D1F]">3. Manage (bottom right)</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-semibold text-[#1D1D1F]">4. Share</li>
+                      <ChevronRight className="size-2.5 text-[#86868B]" />
+                      <li className="font-bold text-[#0071E3]">5. Generate Share Code (Copy Code)</li>
                     </ol>
                   </CollapsibleContent>
                 </Collapsible>
@@ -564,6 +526,82 @@ export function SubmissionDrawer({
               </div>
             </div>
 
+            {/* Graphic Quality & Frame Rate (Graphics category only) */}
+            {category === 'graphics' && (
+              <div className="flex flex-col gap-3.5 rounded-2xl bg-[#F2F2F7]/70 p-4 border border-black/[0.06]">
+                {/* 1. Graphic Quality */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-[#1D1D1F]">
+                      Graphic Quality
+                    </Label>
+                    <span className="text-[10px] text-[#86868B] font-mono font-medium">
+                      BR Mode Style
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 rounded-xl bg-black/[0.04] p-1 border border-black/[0.04]">
+                    {(['Low', 'Medium', 'High', 'Very High'] as GraphicQuality[]).map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(6);
+                          setGraphicQuality(q);
+                        }}
+                        className={cn(
+                          'rounded-lg py-2 text-xs font-semibold transition-all select-none',
+                          graphicQuality === q
+                            ? 'bg-[#0071E3] text-white shadow-sm'
+                            : 'text-[#1D1D1F] hover:bg-white/80'
+                        )}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Frame Rate */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-[#1D1D1F]">
+                      Frame Rate
+                    </Label>
+                    <span className="text-[10px] text-emerald-600 font-mono font-bold tabular-nums">
+                      {fpsTarget === 'Ultra' ? '120 FPS' : fpsTarget === 'Max' ? '60 FPS' : `${fpsTarget} FPS`}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 rounded-xl bg-black/[0.04] p-1 border border-black/[0.04]">
+                    {(['Low', 'Medium', 'High', 'Very High', 'Max', 'Ultra'] as GraphicFrameRate[]).map((fps) => (
+                      <button
+                        key={fps}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(6);
+                          setFpsTarget(fps);
+                        }}
+                        className={cn(
+                          'rounded-lg py-2 text-xs font-semibold transition-all select-none',
+                          fpsTarget === fps
+                            ? 'bg-[#0071E3] text-white shadow-sm'
+                            : 'text-[#1D1D1F] hover:bg-white/80'
+                        )}
+                      >
+                        {fps}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 rounded-xl bg-amber-500/[0.08] border border-amber-500/20 px-3 py-2 text-[11px] text-[#1D1D1F] leading-relaxed">
+                  <Lightbulb className="size-3.5 text-amber-600 shrink-0 mt-0.5" />
+                  <p>
+                    <strong className="font-semibold text-amber-900">Pro Tip:</strong> Most competitive BR players recommend <strong>Medium Graphics</strong> paired with <strong>Ultra Frame Rate</strong> for optimal frame pacing and smoke/foliage visibility.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Grip & Gyro (Sensitivity/HUD only) */}
             {category !== 'graphics' && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -574,9 +612,9 @@ export function SubmissionDrawer({
                     onChange={(e) => setGrip(e.target.value as GripType)}
                     className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="2-Finger Thumbs">2-Finger Thumbs</option>
+                    <option value="2-Finger">2-Finger</option>
                     <option value="3-Finger">3-Finger</option>
-                    <option value="4-Finger Claw">4-Finger Claw</option>
+                    <option value="4-Finger">4-Finger</option>
                     <option value="5+ Finger">5+ Finger</option>
                   </select>
                 </div>
@@ -618,7 +656,7 @@ export function SubmissionDrawer({
                   )}
                 </Label>
                 {compressedSize && (
-                  <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 font-mono tabular-nums text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                     <CheckCircle2 className="size-3" />
                     WebP • {compressedSize}
                   </span>
@@ -641,6 +679,7 @@ export function SubmissionDrawer({
                 /* Preview Container */
                 <div className="relative overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-2 flex flex-col items-center">
                   <div className="relative w-full max-h-52 overflow-hidden rounded-xl flex items-center justify-center bg-black/10">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- transient client-side blob preview */}
                     <img
                       src={screenshotPreview}
                       alt="Uploaded setup preview"
@@ -753,5 +792,24 @@ export function SubmissionDrawer({
         )}
       </DialogContent>
     </Dialog>
+
+    {isOnboardingOpen && user && (
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        currentUser={user}
+        onComplete={(updated) => setUser(updated)}
+      />
+    )}
+
+    {isProfileSettingsOpen && user && (
+      <ProfileSettingsModal
+        isOpen={isProfileSettingsOpen}
+        onClose={() => setIsProfileSettingsOpen(false)}
+        currentUser={user}
+        onProfileUpdated={(updated) => setUser(updated)}
+      />
+    )}
+  </>
   );
 }

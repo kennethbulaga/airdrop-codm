@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Check, Copy, ExternalLink, Flame, ShieldCheck, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -24,9 +25,9 @@ export function HeroSpotlight({ post }: HeroSpotlightProps) {
           <div className="flex size-6 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
             <Check className="size-3.5 stroke-[3]" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs font-semibold">{post.creator_name}&apos;s code copied!</span>
-            <span className="font-mono text-[10px] text-[#86868B]">{post.code}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold truncate">{post.creator_name}&apos;s code copied!</span>
+            <span className="text-[10px] text-[#6E6E73] truncate">Ready to paste into CODM</span>
           </div>
           <span className="ml-2 rounded-full bg-[#0071E3]/10 px-2 py-0.5 font-mono text-[9px] font-bold text-[#0071E3]">
             1-TAP
@@ -48,9 +49,9 @@ export function HeroSpotlight({ post }: HeroSpotlightProps) {
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
                 Season 8 • Battle Royale Pro
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
-                <Flame className="size-3 fill-amber-500 text-amber-500" />
-                Trending Preset
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#FF3B30]/10 border border-[#FF3B30]/25 px-2.5 py-0.5 text-[10px] font-bold text-[#D70015]">
+                <Flame className="size-3 fill-[#FF3B30] text-[#FF3B30]" />
+                Trending Setup
               </span>
             </div>
 
@@ -59,9 +60,11 @@ export function HeroSpotlight({ post }: HeroSpotlightProps) {
               <div className="flex items-center gap-3.5">
                 <div className="relative flex size-14 items-center justify-center rounded-[16px] overflow-hidden bg-gradient-to-br from-[#0071E3] to-[#005bb5] text-white font-bold text-xl shadow-[0_4px_12px_rgba(0,113,227,0.25)] ring-1 ring-black/5 shrink-0">
                   {post.creator_avatar_url ? (
-                    <img
+                    <Image
                       src={post.creator_avatar_url}
                       alt={post.creator_name}
+                      width={56}
+                      height={56}
                       className="size-full object-cover"
                     />
                   ) : (
@@ -75,9 +78,9 @@ export function HeroSpotlight({ post }: HeroSpotlightProps) {
                         {post.team_name}
                       </span>
                     )}
-                    <h1 className="font-heading text-2xl font-bold tracking-tight text-[#1D1D1F] sm:text-3xl">
+                    <h2 className="font-heading text-2xl font-bold tracking-tight text-[#1D1D1F] sm:text-3xl">
                       {post.creator_name}
-                    </h1>
+                    </h2>
                     {post.is_verified && (
                       <ShieldCheck className="size-5 text-[#0071E3] shrink-0" aria-label="Verified Pro" />
                     )}
@@ -150,8 +153,18 @@ export function HeroSpotlight({ post }: HeroSpotlightProps) {
                   {post.gyro ? 'Gyro ON' : 'Gyro OFF'}
                 </span>
               )}
+              {post.category === 'graphics' && post.graphic_quality && (
+                <span className="rounded-full bg-[#F2F2F7] px-3 py-1 font-semibold text-[#1D1D1F]">
+                  {post.graphic_quality} Quality
+                </span>
+              )}
+              {post.category === 'graphics' && post.fps_target && (
+                <span className="rounded-full bg-emerald-500/10 text-emerald-700 px-3 py-1 font-semibold font-mono tabular-nums">
+                  {post.fps_target === 'Ultra' || post.fps_target === 'Max' ? `${post.fps_target} FPS` : `${post.fps_target} Frame Rate`}
+                </span>
+              )}
               <span className="rounded-full bg-[#F2F2F7] text-[#86868B] px-3 py-1 font-mono font-medium">
-                Season {post.season}
+                {post.season.startsWith('Season') ? post.season : `Season ${post.season.replace(/^S/i, '')}`}
               </span>
             </div>
           </div>
