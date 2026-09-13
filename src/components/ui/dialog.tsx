@@ -56,7 +56,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // Base & Typography
-          "fixed z-50 grid w-full outline-none duration-200 bg-white text-sm text-[#1D1D1F]",
+          "fixed z-50 grid w-full max-w-full overflow-x-hidden outline-none duration-200 bg-white text-sm text-[#1D1D1F]",
           // Mobile: Native Bottom Sheet sliding up from bottom
           "inset-x-0 bottom-0 max-h-[90dvh] overflow-y-auto rounded-t-[28px] rounded-b-none border-t border-black/10 p-5 shadow-[0_-8px_32px_rgba(0,0,0,0.14)] pb-[calc(1.25rem+env(safe-area-inset-bottom))]",
           "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom",
