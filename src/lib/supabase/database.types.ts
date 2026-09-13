@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback: {
+        Row: {
+          category: string
+          contact_info: string | null
+          created_at: string
+          id: string
+          message: string
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          contact_info?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          contact_info?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       preset_reports: {
         Row: {
           created_at: string
@@ -97,9 +124,13 @@ export type Database = {
           social_handle: string | null
           social_platform: string | null
           social_url: string | null
+          youtube_url: string | null
+          tiktok_url: string | null
+          facebook_url: string | null
           specs: Json | null
           team_name: string | null
           tier: string | null
+          graphic_quality: string | null
           updated_at: string
           upvotes: number
           user_id: string | null
@@ -128,9 +159,13 @@ export type Database = {
           social_handle?: string | null
           social_platform?: string | null
           social_url?: string | null
+          youtube_url?: string | null
+          tiktok_url?: string | null
+          facebook_url?: string | null
           specs?: Json | null
           team_name?: string | null
           tier?: string | null
+          graphic_quality?: string | null
           updated_at?: string
           upvotes?: number
           user_id?: string | null
@@ -159,9 +194,13 @@ export type Database = {
           social_handle?: string | null
           social_platform?: string | null
           social_url?: string | null
+          youtube_url?: string | null
+          tiktok_url?: string | null
+          facebook_url?: string | null
           specs?: Json | null
           team_name?: string | null
           tier?: string | null
+          graphic_quality?: string | null
           updated_at?: string
           upvotes?: number
           user_id?: string | null
@@ -175,7 +214,14 @@ export type Database = {
           created_at: string
           email: string | null
           full_name: string | null
+          has_completed_onboarding: boolean
           id: string
+          social_handle: string | null
+          social_platform: string | null
+          social_url: string | null
+          youtube_url: string | null
+          tiktok_url: string | null
+          facebook_url: string | null
           updated_at: string
         }
         Insert: {
@@ -184,7 +230,14 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string | null
+          has_completed_onboarding?: boolean
           id: string
+          social_handle?: string | null
+          social_platform?: string | null
+          social_url?: string | null
+          youtube_url?: string | null
+          tiktok_url?: string | null
+          facebook_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -193,7 +246,14 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string | null
+          has_completed_onboarding?: boolean
           id?: string
+          social_handle?: string | null
+          social_platform?: string | null
+          social_url?: string | null
+          youtube_url?: string | null
+          tiktok_url?: string | null
+          facebook_url?: string | null
           updated_at?: string
         }
         Relationships: []
