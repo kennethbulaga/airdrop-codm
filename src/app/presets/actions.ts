@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { presetSubmissionSchema, type PresetSubmissionInput } from '@/lib/validations';
-import { submitRateLimiter, voteRateLimiter } from '@/lib/ratelimit';
+import { submitRateLimiter, voteRateLimiter, reportRateLimiter } from '@/lib/ratelimit';
+import { invalidateFeedCache } from '@/lib/queries';
 
 /**
  * Server Action to submit a new preset into the Supabase presets table.
@@ -65,6 +66,11 @@ export async function createPresetAction(input: PresetSubmissionInput) {
     device_name: data.device_name || null,
     grip: data.grip || null,
     gyro: data.gyro ?? null,
+    graphic_quality: data.graphic_quality || null,
+    fps_target: data.fps_target || null,
+    youtube_url: data.youtube_url || null,
+    tiktok_url: data.tiktok_url || null,
+    facebook_url: data.facebook_url || null,
     social_platform: data.social_platform || null,
     social_handle: data.social_handle || null,
     social_url: data.social_handle
@@ -82,10 +88,11 @@ export async function createPresetAction(input: PresetSubmissionInput) {
 
   if (insertError) {
     console.error('Failed to create preset:', insertError.message);
-    return { success: false, error: insertError.message };
+    return { success: false, error: 'Unable to publish setup. Check your inputs and try again.' };
   }
 
   // 5. Revalidate feed cache
+  await invalidateFeedCache();
   revalidatePath('/');
   return { success: true };
 }
@@ -127,6 +134,7 @@ export async function togglePresetVoteAction(presetId: string) {
     return { success: false, error: error.message };
   }
 
+  await invalidateFeedCache();
   revalidatePath('/');
   return { success: true, data };
 }
@@ -150,7 +158,18 @@ export async function reportPresetAction(
     return { success: false, error: 'Please sign in to report this setup.' };
   }
 
-  // 2. Execute atomic RPC function
+  // 2. Rate limiting check (Upstash Redis: 5 reports per 60s)
+  if (reportRateLimiter) {
+    const { success: allowed } = await reportRateLimiter.limit(`report:${user.id}`);
+    if (!allowed) {
+      return {
+        success: false,
+        error: 'Too many reports submitted. Please wait a moment.',
+      };
+    }
+  }
+
+  // 3. Execute atomic RPC function
   const { data, error } = await supabase.rpc('report_preset', {
     p_preset_id: presetId,
     p_reason: reason,
@@ -158,9 +177,10 @@ export async function reportPresetAction(
 
   if (error) {
     console.error('Failed to report preset:', error.message);
-    return { success: false, error: error.message };
+    return { success: false, error: 'Unable to submit report. Please try again.' };
   }
 
+  await invalidateFeedCache();
   revalidatePath('/');
   return { success: true, data };
 }
@@ -178,29 +198,26 @@ export async function deletePresetAction(presetId: string) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { success: false, error: 'Authentication required.' };
+    return { success: false, error: 'Sign in to delete your setup.' };
   }
 
-  // 2. Fetch preset to verify ownership and retrieve image_url
-  const { data: preset, error: fetchError } = await supabase
+  // 2. Fetch preset to retrieve screenshot path
+  const { data: preset } = await supabase
     .from('presets')
-    .select('id, user_id, image_url')
+    .select('user_id, image_url')
     .eq('id', presetId)
     .single();
 
-  if (fetchError || !preset) {
-    return { success: false, error: 'Setup not found.' };
+  if (!preset || preset.user_id !== user.id) {
+    return { success: false, error: 'Unauthorized to delete this setup.' };
   }
 
-  if (preset.user_id !== user.id) {
-    return { success: false, error: 'You are only authorized to delete your own setups.' };
-  }
-
-  // 3. Clean up storage image if hosted on Supabase Storage
-  if (preset.image_url && preset.image_url.includes('/presets/')) {
+  // 3. Delete screenshot from storage if present
+  if (preset.image_url) {
     try {
-      const storagePath = preset.image_url.split('/presets/')[1];
-      if (storagePath) {
+      const urlParts = preset.image_url.split('/presets/');
+      if (urlParts[1]) {
+        const storagePath = urlParts[1];
         await supabase.storage.from('presets').remove([decodeURIComponent(storagePath)]);
       }
     } catch {
@@ -217,9 +234,10 @@ export async function deletePresetAction(presetId: string) {
 
   if (deleteError) {
     console.error('Failed to delete preset:', deleteError.message);
-    return { success: false, error: deleteError.message };
+    return { success: false, error: 'Unable to delete setup. Please try again.' };
   }
 
+  await invalidateFeedCache();
   revalidatePath('/');
   return { success: true };
 }

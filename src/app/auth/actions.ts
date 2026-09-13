@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import type { UserSessionProfile } from '@/lib/types';
 
 /**
  * Initiates the Google OAuth sign-in flow via PKCE.
@@ -78,14 +79,53 @@ export async function getCurrentUserProfile() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  return {
-    id: user.id,
-    email: user.email,
-    name:
-      user.user_metadata?.full_name ||
-      user.user_metadata?.name ||
-      user.email?.split('@')[0] ||
-      'Operator',
-    avatarUrl: (user.user_metadata?.avatar_url || user.user_metadata?.picture) as string | undefined,
-  };
+  try {
+    const supabase = await createClient();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    return {
+      id: user.id,
+      email: user.email,
+      name:
+        profile?.full_name ||
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split('@')[0] ||
+        'Operator',
+      avatarUrl:
+        profile?.avatar_url ||
+        ((user.user_metadata?.avatar_url || user.user_metadata?.picture) as string | undefined),
+      clanTag: profile?.clan_tag || null,
+      hasCompletedOnboarding: Boolean(profile?.has_completed_onboarding),
+      youtubeUrl: profile?.youtube_url || null,
+      tiktokUrl: profile?.tiktok_url || null,
+      facebookUrl: profile?.facebook_url || null,
+      socialPlatform: (profile?.social_platform as UserSessionProfile['socialPlatform']) || null,
+      socialUrl: profile?.social_url || null,
+      socialHandle: profile?.social_handle || null,
+    };
+  } catch {
+    return {
+      id: user.id,
+      email: user.email,
+      name:
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split('@')[0] ||
+        'Operator',
+      avatarUrl: (user.user_metadata?.avatar_url || user.user_metadata?.picture) as string | undefined,
+      clanTag: null,
+      hasCompletedOnboarding: false,
+      youtubeUrl: null,
+      tiktokUrl: null,
+      facebookUrl: null,
+      socialPlatform: null,
+      socialUrl: null,
+      socialHandle: null,
+    };
+  }
 }
